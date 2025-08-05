@@ -194,4 +194,3 @@ pytest tests/load/
 
 ---
 
-> 🚀 **Generated with Claude Code** - Enterprise E-Commerce Analytics Platform
