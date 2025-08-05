@@ -1,0 +1,89 @@
+[
+    {
+        "product_name": "iPhone 15 128GB",
+        "our_price": 42000,
+        "market_average": 57112.44,
+        "difference_percent": 26.5,
+        "anomaly_type": "DÜŞÜK",
+        "market_prices": [
+            48499.0,
+            49659.0,
+            57792.0,
+            72499.75
+        ],
+        "timestamp": "2025-07-31T12:14:00.240905"
+    },
+    {
+        "product_name": "iPad Pro 11",
+        "our_price": 28000,
+        "market_average": 41388.26,
+        "difference_percent": 32.3,
+        "anomaly_type": "DÜŞÜK",
+        "market_prices": [
+            12499.0,
+            43956.0,
+            44099.04,
+            64999.0
+        ],
+        "timestamp": "2025-07-31T12:14:00.244905"
+    },
+    {
+        "product_name": "AirPods Pro 2",
+        "our_price": 8500,
+        "market_average": 5929.52,
+        "difference_percent": 43.4,
+        "anomaly_type": "YÜKSEK",
+        "market_prices": [
+            558.0,
+            2000.0,
+            5000.0,
+            10448.98,
+            11640.6
+        ],
+        "timestamp": "2025-07-31T12:14:00.248905"
+    },
+    {
+        "product_name": "Dell XPS 13",
+        "our_price": 25000,
+        "market_average": 75517.88,
+        "difference_percent": 66.9,
+        "anomaly_type": "DÜŞÜK",
+        "market_prices": [
+            24424.5,
+            88519.0,
+            94179.0,
+            94949.0
+        ],
+        "timestamp": "2025-07-31T12:14:00.252905"
+    },
+    {
+        "product_name": "HP LaserJet",
+        "our_price": 3500,
+        "market_average": 5834.08,
+        "difference_percent": 40.0,
+        "anomaly_type": "DÜŞÜK",
+        "market_prices": [
+            4239.0,
+            4300.0,
+            5696.0,
+            7286.4,
+            7649.0
+        ],
+        "timestamp": "2025-07-31T12:14:00.259908"
+    },
+    {
+        "product_name": "Canon EOS R6",
+        "our_price": 45000,
+        "market_average": 88624.48,
+        "difference_percent": 49.2,
+        "anomaly_type": "DÜŞÜK",
+        "market_prices": [
+            71735.02,
+            79999.0,
+            92499.39,
+            98989.98,
+            99899.0
+        ],
+        "timestamp": "2025-07-31T12:14:00.263906"
+    }
+]

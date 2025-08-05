@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+
+{% block title %}Anomaliler - E-Ticaret Fiyat Analiz{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-6 mb-0">
+            <i class="bi bi-exclamation-triangle text-warning"></i>
+            Fiyat Anomalileri
+        </h1>
+        <p class="text-muted">Tespit edilen fiyat anomalileri ve otomatik uyarılar</p>
+    </div>
+</div>
+
+<!-- Anomaly Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="stat-card danger">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-number" id="highRiskCount">-</div>
+                    <div>Yüksek Risk</div>
+                </div>
+                <div class="display-4">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="stat-card warning">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-number" id="mediumRiskCount">-</div>
+                    <div>Orta Risk</div>
+                </div>
+                <div class="display-4">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="stat-card info">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-number" id="lowRiskCount">-</div>
+                    <div>Düşük Risk</div>
+                </div>
+                <div class="display-4">
+                    <i class="bi bi-info-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="stat-card success">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-number" id="resolvedCount">-</div>
+                    <div>Çözümlenen</div>
+                </div>
+                <div class="display-4">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Anomaly Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-funnel"></i>
+                    Filtreler
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="severityFilter" class="form-label">Önem Derecesi:</label>
+                        <select class="form-select" id="severityFilter" onchange="filterAnomalies()">
+                            <option value="">Tümü</option>
+                            <option value="high">Yüksek</option>
+                            <option value="medium">Orta</option>
+                            <option value="low">Düşük</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="typeFilter" class="form-label">Anomali Türü:</label>
+                        <select class="form-select" id="typeFilter" onchange="filterAnomalies()">
+                            <option value="">Tümü</option>
+                            <option value="price_spike">Fiyat Sıçraması</option>
+                            <option value="price_drop">Fiyat Düşüşü</option>
+                            <option value="competitor_anomaly">Rekabet Anomalisi</option>
+                            <option value="seasonal_anomaly">Sezonsal Anomali</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="statusFilter" class="form-label">Durum:</label>
+                        <select class="form-select" id="statusFilter" onchange="filterAnomalies()">
+                            <option value="active">Aktif</option>
+                            <option value="resolved">Çözümlenen</option>
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="dateFilter" class="form-label">Tarih Aralığı:</label>
+                        <select class="form-select" id="dateFilter" onchange="filterAnomalies()">
+                            <option value="7">Son 7 gün</option>
+                            <option value="30" selected>Son 30 gün</option>
+                            <option value="90">Son 90 gün</option>
+                            <option value="">Tüm zamanlar</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" onclick="refreshAnomalies()">
+                        <i class="bi bi-arrow-clockwise"></i> Yenile
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="exportAnomalies()">
+                        <i class="bi bi-download"></i> Dışa Aktar
+                    </button>
+                    <button class="btn btn-outline-success" onclick="bulkResolve()">
+                        <i class="bi bi-check-all"></i> Toplu Çözümle
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Anomalies List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-ul"></i>
+                        Anomali Listesi
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary btn-sm active" onclick="toggleView('list')">
+                                <i class="bi bi-list"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleView('card')">
+                                <i class="bi bi-grid"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="anomaliesContainer">
+                    {% if anomalies %}
+                    <div id="listView">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="anomaliesTable">
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()">
+                                        </th>
+                                        <th>Ürün</th>
+                                        <th>Anomali Türü</th>
+                                        <th>Önem</th>
+                                        <th>Sapma</th>
+                                        <th>Tespit Tarihi</th>
+                                        <th>Durum</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for anomaly_data in anomalies %}
+                                        {% set anomaly = anomaly_data[0] %}
+                                        {% set product_name = anomaly_data[1] %}
+                                        <tr class="anomaly-row" data-severity="{{ anomaly.severity }}" data-type="{{ anomaly.anomaly_type }}" data-status="{{ 'resolved' if anomaly.is_resolved else 'active' }}">
+                                            <td>
+                                                <input type="checkbox" class="form-check-input anomaly-checkbox" value="{{ anomaly.id }}">
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <strong>{{ product_name }}</strong>
+                                                    <br><small class="text-muted">ID: {{ anomaly.product_id }}</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">
+                                                    {{ anomaly.anomaly_type|title }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge anomaly-{{ anomaly.severity }}">
+                                                    {{ anomaly.severity|title }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <strong class="text-{% if anomaly.deviation_percent > 0 %}danger{% else %}success{% endif %}">
+                                                    {% if anomaly.deviation_percent > 0 %}+{% endif %}{{ "{:.1f}".format(anomaly.deviation_percent) }}%
+                                                </strong>
+                                            </td>
+                                            <td>
+                                                <small data-timestamp="{{ anomaly.detected_at }}">
+                                                    {{ anomaly.detected_at.strftime('%d.%m.%Y %H:%M') }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                {% if anomaly.is_resolved %}
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-check-circle"></i> Çözümlendi
+                                                    </span>
+                                                    {% if anomaly.resolved_at %}
+                                                        <br><small class="text-muted">{{ anomaly.resolved_at.strftime('%d.%m.%Y') }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge bg-warning">
+                                                        <i class="bi bi-clock"></i> Beklemede
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    {% if not anomaly.is_resolved %}
+                                                        <button class="btn btn-outline-success btn-sm" 
+                                                                onclick="resolveAnomaly({{ anomaly.id }})"
+                                                                title="Çözümle">
+                                                            <i class="bi bi-check"></i>
+                                                        </button>
+                                                    {% endif %}
+                                                    <button class="btn btn-outline-primary btn-sm" 
+                                                            onclick="viewAnomalyDetail({{ anomaly.id }})"
+                                                            title="Detay">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-info btn-sm" 
+                                                            onclick="analyzeAnomaly({{ anomaly.id }})"
+                                                            title="Analiz Et">
+                                                        <i class="bi bi-graph-up"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="cardView" style="display: none;">
+                        <div class="row">
+                            {% for anomaly_data in anomalies %}
+                                {% set anomaly = anomaly_data[0] %}
+                                {% set product_name = anomaly_data[1] %}
+                                <div class="col-lg-4 col-md-6 mb-4 anomaly-card" data-severity="{{ anomaly.severity }}" data-type="{{ anomaly.anomaly_type }}" data-status="{{ 'resolved' if anomaly.is_resolved else 'active' }}">
+                                    <div class="card border-{% if anomaly.severity == 'high' %}danger{% elif anomaly.severity == 'medium' %}warning{% else %}info{% endif %}">
+                                        <div class="card-header bg-{% if anomaly.severity == 'high' %}danger{% elif anomaly.severity == 'medium' %}warning{% else %}info{% endif %} text-white">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0">{{ anomaly.anomaly_type|title }}</h6>
+                                                <span class="badge bg-light text-dark">{{ anomaly.severity|title }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <h6 class="card-title">{{ product_name }}</h6>
+                                            <p class="card-text">
+                                                <strong>Sapma:</strong> {% if anomaly.deviation_percent > 0 %}+{% endif %}{{ "{:.1f}".format(anomaly.deviation_percent) }}%<br>
+                                                <strong>Tespit:</strong> {{ anomaly.detected_at.strftime('%d.%m.%Y %H:%M') }}
+                                            </p>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                {% if anomaly.is_resolved %}
+                                                    <span class="badge bg-success">Çözümlendi</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">Beklemede</span>
+                                                {% endif %}
+                                                <div class="btn-group">
+                                                    {% if not anomaly.is_resolved %}
+                                                        <button class="btn btn-outline-success btn-sm" onclick="resolveAnomaly({{ anomaly.id }})">
+                                                            <i class="bi bi-check"></i>
+                                                        </button>
+                                                    {% endif %}
+                                                    <button class="btn btn-outline-primary btn-sm" onclick="viewAnomalyDetail({{ anomaly.id }})">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-check-circle display-1"></i>
+                        <h4>Anomali tespit edilmedi</h4>
+                        <p>Şu anda hiçbir fiyat anomalisi bulunmuyor.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Anomaly Detail Modal -->
+<div class="modal fade" id="anomalyDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Anomali Detayı
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="anomalyDetailContent">
+                <!-- Content will be loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                <button type="button" class="btn btn-success" id="resolveFromModal">Çözümle</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    loadAnomalyStats();
+    updateTimestamps();
+});
+
+// Load anomaly statistics
+function loadAnomalyStats() {
+    const anomalies = document.querySelectorAll('.anomaly-row, .anomaly-card');
+    let high = 0, medium = 0, low = 0, resolved = 0;
+    
+    anomalies.forEach(anomaly => {
+        const severity = anomaly.dataset.severity;
+        const status = anomaly.dataset.status;
+        
+        if (status === 'resolved') {
+            resolved++;
+        } else {
+            switch(severity) {
+                case 'high': high++; break;
+                case 'medium': medium++; break;
+                case 'low': low++; break;
+            }
+        }
+    });
+    
+    document.getElementById('highRiskCount').textContent = high;
+    document.getElementById('mediumRiskCount').textContent = medium;
+    document.getElementById('lowRiskCount').textContent = low;
+    document.getElementById('resolvedCount').textContent = resolved;
+}
+
+// Filter anomalies
+function filterAnomalies() {
+    const severityFilter = document.getElementById('severityFilter').value;
+    const typeFilter = document.getElementById('typeFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const dateFilter = document.getElementById('dateFilter').value;
+    
+    const rows = document.querySelectorAll('.anomaly-row');
+    const cards = document.querySelectorAll('.anomaly-card');
+    
+    [...rows, ...cards].forEach(element => {
+        let show = true;
+        
+        if (severityFilter && element.dataset.severity !== severityFilter) show = false;
+        if (typeFilter && element.dataset.type !== typeFilter) show = false;
+        if (statusFilter && element.dataset.status !== statusFilter) show = false;
+        
+        // Date filtering would be implemented here
+        
+        element.style.display = show ? '' : 'none';
+    });
+}
+
+// Toggle view between list and card
+function toggleView(viewType) {
+    const listView = document.getElementById('listView');
+    const cardView = document.getElementById('cardView');
+    const buttons = document.querySelectorAll('.btn-group .btn');
+    
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    if (viewType === 'list') {
+        listView.style.display = 'block';
+        cardView.style.display = 'none';
+        buttons[0].classList.add('active');
+    } else {
+        listView.style.display = 'none';
+        cardView.style.display = 'block';
+        buttons[1].classList.add('active');
+    }
+}
+
+// Toggle select all checkboxes
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.anomaly-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+}
+
+// Resolve single anomaly
+async function resolveAnomaly(anomalyId) {
+    const notes = prompt('Çözüm notu (opsiyonel):') || '';
+    
+    try {
+        const response = await fetch(`/api/anomalies/resolve/${anomalyId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ notes })
+        });
+        
+        if (response.ok) {
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert(`Hata: ${error.error || 'Anomali çözümlenirken hata oluştu'}`);
+        }
+        
+    } catch (error) {
+        console.error('Error resolving anomaly:', error);
+        alert('Anomali çözümlenirken hata oluştu');
+    }
+}
+
+// Bulk resolve selected anomalies
+async function bulkResolve() {
+    const selected = document.querySelectorAll('.anomaly-checkbox:checked');
+    
+    if (selected.length === 0) {
+        alert('Lütfen çözümlenecek anomalileri seçin');
+        return;
+    }
+    
+    const notes = prompt('Toplu çözüm notu (opsiyonel):') || '';
+    const anomalyIds = Array.from(selected).map(checkbox => checkbox.value);
+    
+    try {
+        const promises = anomalyIds.map(id => 
+            fetch(`/api/anomalies/resolve/${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ notes })
+            })
+        );
+        
+        await Promise.all(promises);
+        location.reload();
+        
+    } catch (error) {
+        console.error('Error bulk resolving anomalies:', error);
+        alert('Toplu çözümleme sırasında hata oluştu');
+    }
+}
+
+// View anomaly detail
+async function viewAnomalyDetail(anomalyId) {
+    const modal = new bootstrap.Modal(document.getElementById('anomalyDetailModal'));
+    const content = document.getElementById('anomalyDetailContent');
+    
+    showLoading(content);
+    
+    try {
+        // This would be a real API call to get anomaly details
+        const anomalyDetail = {
+            id: anomalyId,
+            product_name: 'iPhone 15 128GB',
+            anomaly_type: 'price_spike',
+            severity: 'high',
+            deviation_percent: 15.7,
+            detected_at: new Date(),
+            current_price: 42000,
+            expected_price: 36000,
+            market_avg: 38000,
+            competitor_count: 8,
+            description: 'Bu ürünün fiyatı piyasa ortalamasından %15.7 daha yüksek tespit edildi.'
+        };
+        
+        content.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Temel Bilgiler</h6>
+                    <table class="table table-sm">
+                        <tr><td><strong>Ürün:</strong></td><td>${anomalyDetail.product_name}</td></tr>
+                        <tr><td><strong>Anomali Türü:</strong></td><td>${anomalyDetail.anomaly_type}</td></tr>
+                        <tr><td><strong>Önem Derecesi:</strong></td><td><span class="badge anomaly-${anomalyDetail.severity}">${anomalyDetail.severity}</span></td></tr>
+                        <tr><td><strong>Sapma:</strong></td><td>${anomalyDetail.deviation_percent}%</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6>Fiyat Analizi</h6>
+                    <table class="table table-sm">
+                        <tr><td><strong>Mevcut Fiyat:</strong></td><td>₺${anomalyDetail.current_price.toLocaleString()}</td></tr>
+                        <tr><td><strong>Beklenen Fiyat:</strong></td><td>₺${anomalyDetail.expected_price.toLocaleString()}</td></tr>
+                        <tr><td><strong>Piyasa Ortalaması:</strong></td><td>₺${anomalyDetail.market_avg.toLocaleString()}</td></tr>
+                        <tr><td><strong>Rekabetçi Sayısı:</strong></td><td>${anomalyDetail.competitor_count}</td></tr>
+                    </table>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h6>Açıklama</h6>
+                    <div class="alert alert-info">
+                        ${anomalyDetail.description}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Set resolve button action
+        document.getElementById('resolveFromModal').onclick = () => {
+            modal.hide();
+            resolveAnomaly(anomalyId);
+        };
+        
+    } catch (error) {
+        content.innerHTML = `
+            <div class="alert alert-danger">
+                Anomali detayları yüklenirken hata oluştu: ${error.message}
+            </div>
+        `;
+    }
+    
+    modal.show();
+}
+
+// Analyze anomaly
+async function analyzeAnomaly(anomalyId) {
+    alert(`Anomali ${anomalyId} için detaylı analiz başlatılıyor...`);
+    // This would trigger a detailed analysis of the specific anomaly
+}
+
+// Refresh anomalies
+function refreshAnomalies() {
+    location.reload();
+}
+
+// Export anomalies
+function exportAnomalies() {
+    const anomalies = [];
+    const rows = document.querySelectorAll('.anomaly-row:not([style*="display: none"])');
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        anomalies.push({
+            product: cells[1].textContent.trim(),
+            type: cells[2].textContent.trim(),
+            severity: cells[3].textContent.trim(),
+            deviation: cells[4].textContent.trim(),
+            detected_at: cells[5].textContent.trim(),
+            status: cells[6].textContent.trim()
+        });
+    });
+    
+    const csv = [
+        'Ürün,Anomali Türü,Önem,Sapma,Tespit Tarihi,Durum',
+        ...anomalies.map(a => `"${a.product}","${a.type}","${a.severity}","${a.deviation}","${a.detected_at}","${a.status}"`)
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `anomalies_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Update timestamps to relative time
+function updateTimestamps() {
+    const timeElements = document.querySelectorAll('[data-timestamp]');
+    timeElements.forEach(element => {
+        const timestamp = element.dataset.timestamp;
+        if (timestamp && typeof moment !== 'undefined') {
+            element.textContent = moment(timestamp).fromNow();
+        }
+    });
+}
+</script>
+{% endblock %}

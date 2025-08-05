@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}Hata - E-Ticaret Fiyat Analiz{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="text-center py-5">
+            <!-- Error Icon -->
+            <div class="mb-4">
+                <i class="bi bi-exclamation-triangle-fill display-1 text-warning"></i>
+            </div>
+            
+            <!-- Error Title -->
+            <h1 class="display-4 mb-3">Bir Hata Oluştu</h1>
+            
+            <!-- Error Message -->
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading">
+                    <i class="bi bi-bug"></i>
+                    Hata Detayı
+                </h4>
+                <p class="mb-0">
+                    {% if error %}
+                        {{ error }}
+                    {% else %}
+                        Beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.
+                    {% endif %}
+                </p>
+            </div>
+            
+            <!-- Error Actions -->
+            <div class="row mt-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="bi bi-arrow-left-circle display-4 text-primary mb-3"></i>
+                            <h5>Geri Dön</h5>
+                            <p class="text-muted small">Önceki sayfaya dönmek için tıklayın</p>
+                            <button class="btn btn-primary" onclick="history.back()">
+                                <i class="bi bi-arrow-left"></i> Geri Dön
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="bi bi-house-door display-4 text-success mb-3"></i>
+                            <h5>Ana Sayfa</h5>
+                            <p class="text-muted small">Dashboard'a gitmek için tıklayın</p>
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-success">
+                                <i class="bi bi-house"></i> Ana Sayfa
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="bi bi-arrow-clockwise display-4 text-info mb-3"></i>
+                            <h5>Yenile</h5>
+                            <p class="text-muted small">Sayfayı yenilemek için tıklayın</p>
+                            <button class="btn btn-info" onclick="location.reload()">
+                                <i class="bi bi-arrow-clockwise"></i> Yenile
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Helpful Links -->
+            <div class="mt-4">
+                <h5>Yardımcı Bağlantılar</h5>
+                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                    <a href="{{ url_for('analytics') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-graph-up"></i> Analitik
+                    </a>
+                    <a href="{{ url_for('anomalies') }}" class="btn btn-outline-warning">
+                        <i class="bi bi-exclamation-triangle"></i> Anomaliler
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Error Reporting -->
+            <div class="mt-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-bug"></i>
+                            Hata Bildirimi
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Bu hatanın devam etmesi durumunda, lütfen aşağıdaki bilgileri sistem yöneticisine iletin:
+                        </p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Hata Zamanı:</strong><br>
+                                <code id="errorTime">-</code>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Sayfa URL:</strong><br>
+                                <code id="currentUrl">-</code>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <strong>Tarayıcı:</strong><br>
+                                <code id="userAgent">-</code>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Hata Kodu:</strong><br>
+                                <code>
+                                    {% if request.endpoint %}
+                                        {{ request.endpoint }}
+                                    {% else %}
+                                        UNKNOWN
+                                    {% endif %}
+                                </code>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="copyErrorInfo()">
+                                <i class="bi bi-clipboard"></i> Hata Bilgilerini Kopyala
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="reportError()">
+                                <i class="bi bi-envelope"></i> Hata Bildir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Debug Information (Development Only) -->
+{% if config.DEBUG %}
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-code-slash"></i>
+                    Debug Bilgileri (Geliştirme Modu)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Request Bilgileri:</h6>
+                        <pre class="bg-light p-2"><code>Method: {{ request.method }}
+URL: {{ request.url }}
+Endpoint: {{ request.endpoint }}
+Remote Addr: {{ request.remote_addr }}</code></pre>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Headers:</h6>
+                        <pre class="bg-light p-2"><code>{% for key, value in request.headers %}{{ key }}: {{ value }}
+{% endfor %}</code></pre>
+                    </div>
+                </div>
+                
+                {% if error %}
+                <div class="mt-3">
+                    <h6>Hata Detayı:</h6>
+                    <pre class="bg-light p-2"><code>{{ error }}</code></pre>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Initialize error page
+document.addEventListener('DOMContentLoaded', function() {
+    // Set current URL
+    document.getElementById('currentUrl').textContent = window.location.href;
+    
+    // Set error time
+    document.getElementById('errorTime').textContent = new Date().toLocaleString('tr-TR');
+    
+    // Set user agent (truncated)
+    const userAgent = navigator.userAgent;
+    const truncatedUA = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
+    document.getElementById('userAgent').textContent = truncatedUA;
+    
+    // Auto-report error if it's a server error
+    if (window.location.href.includes('500')) {
+        console.error('Server error detected, consider auto-reporting');
+    }
+});
+
+// Copy error information to clipboard
+function copyErrorInfo() {
+    const errorInfo = {
+        timestamp: new Date().toLocaleString('tr-TR'),
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        error: {{ (error|tojson) if error else '"Unknown error"' }},
+        referrer: document.referrer || 'Direct access'
+    };
+    
+    const errorText = Object.entries(errorInfo)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('\n');
+    
+    navigator.clipboard.writeText(errorText).then(function() {
+        // Show success feedback
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check"></i> Kopyalandı!';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-secondary');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-secondary');
+        }, 2000);
+    }).catch(function(err) {
+        console.error('Clipboard copy failed:', err);
+        alert('Kopyalama başarısız. Lütfen manuel olarak seçin ve kopyalayın.');
+    });
+}
+
+// Report error via email/form
+function reportError() {
+    const errorInfo = {
+        timestamp: new Date().toLocaleString('tr-TR'),
+        url: window.location.href,
+        error: {{ (error|tojson) if error else '"Unknown error"' }},
+        userAgent: navigator.userAgent
+    };
+    
+    // Create email body
+    const subject = encodeURIComponent('E-Ticaret Fiyat Analiz Sistemi - Hata Bildirimi');
+    const body = encodeURIComponent(`Hata Bildirimi:
+
+Zaman: ${errorInfo.timestamp}
+URL: ${errorInfo.url}
+Hata: ${errorInfo.error}
+Tarayıcı: ${errorInfo.userAgent}
+
+Lütfen bu hatayı inceleyin.`);
+    
+    // Try to open email client
+    const mailtoLink = `mailto:support@example.com?subject=${subject}&body=${body}`;
+    
+    try {
+        window.open(mailtoLink);
+    } catch (error) {
+        // Fallback: Show modal with error information
+        alert('E-posta istemcisi açılamadı. Lütfen hata bilgilerini manuel olarak kopyalayın ve sistem yöneticisine gönderin.');
+        copyErrorInfo();
+    }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // ESC to go back
+    if (e.key === 'Escape') {
+        history.back();
+    }
+    
+    // Ctrl+R or F5 to reload
+    if ((e.ctrlKey && e.key === 'r') || e.key === 'F5') {
+        e.preventDefault();
+        location.reload();
+    }
+    
+    // Ctrl+H for home
+    if (e.ctrlKey && e.key === 'h') {
+        e.preventDefault();
+        window.location.href = '{{ url_for("dashboard") }}';
+    }
+});
+
+// Auto-refresh option for temporary errors
+let autoRefreshTimer;
+function startAutoRefresh(seconds = 30) {
+    autoRefreshTimer = setTimeout(() => {
+        console.log('Auto-refreshing page due to error...');
+        location.reload();
+    }, seconds * 1000);
+}
+
+// For 5xx errors, start auto-refresh
+if (window.location.href.includes('50')) {
+    console.log('Server error detected, will auto-refresh in 30 seconds');
+    startAutoRefresh(30);
+    
+    // Show countdown
+    let countdown = 30;
+    const countdownElement = document.createElement('div');
+    countdownElement.className = 'alert alert-info mt-3';
+    countdownElement.innerHTML = `
+        <i class="bi bi-clock"></i>
+        <strong>Auto-refresh:</strong> Sayfa <span id="countdown">${countdown}</span> saniye içinde otomatik olarak yenilenecek.
+        <button class="btn btn-outline-primary btn-sm ms-2" onclick="clearTimeout(autoRefreshTimer)">İptal</button>
+    `;
+    
+    document.querySelector('.col-lg-8').appendChild(countdownElement);
+    
+    const countdownInterval = setInterval(() => {
+        countdown--;
+        const countdownSpan = document.getElementById('countdown');
+        if (countdownSpan) {
+            countdownSpan.textContent = countdown;
+        }
+        
+        if (countdown <= 0) {
+            clearInterval(countdownInterval);
+        }
+    }, 1000);
+}
+</script>
+{% endblock %}

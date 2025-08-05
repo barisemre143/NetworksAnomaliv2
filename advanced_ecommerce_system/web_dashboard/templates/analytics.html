@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+
+{% block title %}Analitik - E-Ticaret Fiyat Analiz{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-6 mb-0">
+            <i class="bi bi-graph-up text-primary"></i>
+            Analitik Dashboard
+        </h1>
+        <p class="text-muted">Gelişmiş fiyat analizi ve pazar istihbaratı</p>
+    </div>
+</div>
+
+<!-- Analytics Controls -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-sliders"></i>
+                    Analiz Kontrolleri
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="productSelect" class="form-label">Ürün Seçin:</label>
+                        <select class="form-select" id="productSelect">
+                            <option value="">Tüm ürünler</option>
+                            {% for product in products %}
+                            <option value="{{ product.id }}">{{ product.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="timeRange" class="form-label">Zaman Aralığı:</label>
+                        <select class="form-select" id="timeRange">
+                            <option value="7">Son 7 gün</option>
+                            <option value="30" selected>Son 30 gün</option>
+                            <option value="90">Son 90 gün</option>
+                            <option value="180">Son 6 ay</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="analysisType" class="form-label">Analiz Türü:</label>
+                        <select class="form-select" id="analysisType">
+                            <option value="trend">Trend Analizi</option>
+                            <option value="competitive">Rekabetçi Analiz</option>
+                            <option value="forecasting">Tahmin Modelleri</option>
+                            <option value="risk">Risk Analizi</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" onclick="runAnalysis()">
+                        <i class="bi bi-play-circle"></i> Analiz Çalıştır
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="exportResults()">
+                        <i class="bi bi-download"></i> Sonuçları İndir
+                    </button>
+                    <button class="btn btn-outline-info" onclick="scheduleAnalysis()">
+                        <i class="bi bi-clock"></i> Otomatik Analiz
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-speedometer2"></i>
+                    Hızlı İstatistikler
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="mb-2">
+                            <h4 class="text-primary mb-0" id="totalProducts">-</h4>
+                            <small class="text-muted">Ürün</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="mb-2">
+                            <h4 class="text-success mb-0" id="avgAccuracy">-</h4>
+                            <small class="text-muted">Doğruluk</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="mb-2">
+                            <h4 class="text-warning mb-0" id="riskScore">-</h4>
+                            <small class="text-muted">Risk</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analysis Results -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-bar-chart-line"></i>
+                        Analiz Sonuçları
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="toggleFullscreen()">
+                            <i class="bi bi-arrows-fullscreen"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="refreshAnalysis()">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="analysisContainer">
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-graph-up display-1"></i>
+                        <h4>Analiz sonuçları burada görünecek</h4>
+                        <p>Yukarıdaki kontrollerden bir analiz seçip "Analiz Çalıştır" butonuna tıklayın</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Advanced Charts Row -->
+<div class="row mt-4" id="advancedChartsRow" style="display: none;">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-down"></i>
+                    Tahmin vs Gerçek
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="forecastChart" style="height: 350px;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pie-chart"></i>
+                    Pazar Payı Analizi
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="marketShareChart" style="height: 350px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Model Performance -->
+<div class="row mt-4" id="modelPerformanceRow" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-cpu"></i>
+                    Model Performansı
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0">ARIMA Model</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>MAE:</span>
+                                    <strong id="arimaMae">-</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>RMSE:</span>
+                                    <strong id="arimaRmse">-</strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>AIC:</span>
+                                    <strong id="arimaAic">-</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0">LSTM Model</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>MAE:</span>
+                                    <strong id="lstmMae">-</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>RMSE:</span>
+                                    <strong id="lstmRmse">-</strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Val Loss:</span>
+                                    <strong id="lstmValLoss">-</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card border-info">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">Prophet Model</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>MAE:</span>
+                                    <strong id="prophetMae">-</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>RMSE:</span>
+                                    <strong id="prophetRmse">-</strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Trend:</span>
+                                    <strong id="prophetTrend">-</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentAnalysis = null;
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    loadQuickStats();
+});
+
+// Load quick statistics
+async function loadQuickStats() {
+    try {
+        const stats = await apiCall('/api/dashboard-stats');
+        
+        document.getElementById('totalProducts').textContent = stats.total_products;
+        document.getElementById('avgAccuracy').textContent = '95%'; // Placeholder
+        document.getElementById('riskScore').textContent = 'LOW'; // Placeholder
+        
+    } catch (error) {
+        console.error('Failed to load quick stats:', error);
+    }
+}
+
+// Run analysis based on selected parameters
+async function runAnalysis() {
+    const productId = document.getElementById('productSelect').value;
+    const timeRange = document.getElementById('timeRange').value;
+    const analysisType = document.getElementById('analysisType').value;
+    
+    const container = document.getElementById('analysisContainer');
+    showLoading(container);
+    
+    try {
+        let analysisResults;
+        
+        if (productId) {
+            // Single product analysis
+            analysisResults = await apiCall(`/api/product/${productId}/trend-analysis?days=${timeRange}`);
+        } else {
+            // Multi-product analysis (implement this endpoint)
+            analysisResults = await runMultiProductAnalysis(timeRange, analysisType);
+        }
+        
+        currentAnalysis = analysisResults;
+        displayAnalysisResults(analysisResults, analysisType);
+        
+    } catch (error) {
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                Analiz çalıştırılırken hata oluştu: ${error.message}
+            </div>
+        `;
+    }
+}
+
+// Display analysis results
+function displayAnalysisResults(results, analysisType) {
+    const container = document.getElementById('analysisContainer');
+    
+    let html = `<div class="analysis-results-${analysisType}">`;
+    
+    switch(analysisType) {
+        case 'trend':
+            html += displayTrendAnalysis(results);
+            break;
+        case 'competitive':
+            html += displayCompetitiveAnalysis(results);
+            break;
+        case 'forecasting':
+            html += displayForecastingAnalysis(results);
+            break;
+        case 'risk':
+            html += displayRiskAnalysis(results);
+            break;
+        default:
+            html += displayGeneralAnalysis(results);
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Show advanced charts
+    document.getElementById('advancedChartsRow').style.display = 'block';
+    document.getElementById('modelPerformanceRow').style.display = 'block';
+    
+    // Update model performance
+    updateModelPerformance(results);
+    
+    // Create charts
+    createForecastChart(results);
+    createMarketShareChart(results);
+}
+
+// Display trend analysis
+function displayTrendAnalysis(results) {
+    let html = '<div class="trend-analysis-section">';
+    html += '<h4><i class="bi bi-graph-up"></i> Trend Analizi Sonuçları</h4>';
+    
+    if (results.decomposition) {
+        const decomp = results.decomposition;
+        html += `
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="stat-card info">
+                        <div class="stat-number">${decomp.trend_direction.toUpperCase()}</div>
+                        <div>Trend Yönü</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card success">
+                        <div class="stat-number">${(decomp.trend_strength * 100).toFixed(1)}%</div>
+                        <div>Trend Gücü</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card warning">
+                        <div class="stat-number">${(decomp.seasonal_strength * 100).toFixed(1)}%</div>
+                        <div>Sezonluk Güç</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-number">${decomp.trend_slope > 0 ? '+' : ''}${decomp.trend_slope.toFixed(3)}</div>
+                        <div>Eğim</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    if (results.seasonality) {
+        const seasonal = results.seasonality;
+        html += `
+            <div class="alert alert-info">
+                <h5><i class="bi bi-calendar3"></i> Sezonluk Analiz</h5>
+                <p><strong>Sezonluk tespit edildi:</strong> ${seasonal.seasonality_detected ? 'Evet' : 'Hayır'}</p>
+                <p><strong>En yüksek gün:</strong> ${seasonal.peak_day}</p>
+                <p><strong>En düşük gün:</strong> ${seasonal.valley_day}</p>
+                <p><strong>Sezonluk güç:</strong> ${(seasonal.seasonality_strength * 100).toFixed(1)}%</p>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+// Display competitive analysis
+function displayCompetitiveAnalysis(results) {
+    let html = '<div class="competitive-analysis-section">';
+    html += '<h4><i class="bi bi-people"></i> Rekabetçi Analiz</h4>';
+    
+    html += `
+        <div class="alert alert-primary">
+            <h5>Pazar Pozisyonu Analizi</h5>
+            <p>Bu bölüm rekabetçi pozisyonlama ve pazar payı analizini içerir.</p>
+            <p class="mb-0"><small class="text-muted">Detaylı rekabet analizi için daha fazla veri gerekli.</small></p>
+        </div>
+    `;
+    
+    html += '</div>';
+    return html;
+}
+
+// Display forecasting analysis
+function displayForecastingAnalysis(results) {
+    let html = '<div class="forecasting-analysis-section">';
+    html += '<h4><i class="bi bi-graph-down"></i> Tahmin Modelleri</h4>';
+    
+    const models = ['arima', 'lstm', 'prophet'];
+    html += '<div class="row">';
+    
+    models.forEach(model => {
+        if (results[model] && results[model].forecast) {
+            html += `
+                <div class="col-md-4 mb-3">
+                    <div class="card border-primary">
+                        <div class="card-header">
+                            <h6 class="mb-0">${model.toUpperCase()} Tahmin</h6>
+                        </div>
+                        <div class="card-body">
+                            <h4 class="text-primary">₺${results[model].forecast[6].toFixed(2)}</h4>
+                            <small class="text-muted">7 gün sonra</small>
+                            <div class="mt-2">
+                                <small>MAE: ₺${results[model].mae.toFixed(2)}</small><br>
+                                <small>RMSE: ₺${results[model].rmse.toFixed(2)}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    html += '</div>';
+    
+    if (results.ensemble) {
+        html += `
+            <div class="alert alert-success">
+                <h5><i class="bi bi-cpu"></i> Ensemble Tahmin</h5>
+                <h3>₺${results.ensemble.forecast[6].toFixed(2)}</h3>
+                <p class="mb-0">Tüm modellerin ağırlıklı ortalaması</p>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+// Display risk analysis
+function displayRiskAnalysis(results) {
+    let html = '<div class="risk-analysis-section">';
+    html += '<h4><i class="bi bi-shield-exclamation"></i> Risk Analizi</h4>';
+    
+    if (results.risk_assessment) {
+        const risk = results.risk_assessment;
+        const riskColor = risk.risk_level === 'high' ? 'danger' : risk.risk_level === 'medium' ? 'warning' : 'success';
+        
+        html += `
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="stat-card ${riskColor}">
+                        <div class="stat-number">${risk.risk_level.toUpperCase()}</div>
+                        <div>Risk Seviyesi</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card info">
+                        <div class="stat-number">${formatPercent(risk.volatility)}</div>
+                        <div>Volatilite</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card warning">
+                        <div class="stat-number">${formatPercent(risk.var_95)}</div>
+                        <div>VaR (95%)</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card ${risk.momentum_7d > 0 ? 'success' : 'danger'}">
+                        <div class="stat-number">${formatPercent(risk.momentum_7d)}</div>
+                        <div>7G Momentum</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        html += `
+            <div class="alert alert-${riskColor}">
+                <h5>Risk Değerlendirmesi</h5>
+                <p><strong>Mevcut Fiyat:</strong> ₺${risk.current_price.toFixed(2)}</p>
+                <p><strong>30 Günlük Aralık:</strong> ₺${risk.price_range_30d.min.toFixed(2)} - ₺${risk.price_range_30d.max.toFixed(2)}</p>
+                <p><strong>Maksimum Düşüş:</strong> ${formatPercent(risk.max_drawdown)}</p>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+// Display general analysis
+function displayGeneralAnalysis(results) {
+    let html = '<div class="general-analysis-section">';
+    html += '<h4><i class="bi bi-bar-chart-line"></i> Genel Analiz</h4>';
+    
+    html += `
+        <div class="row">
+            <div class="col-md-6">
+                <h5>Veri Özeti</h5>
+                <ul class="list-unstyled">
+                    <li><strong>Veri Noktası:</strong> ${results.data_points}</li>
+                    <li><strong>Tarih Aralığı:</strong> ${new Date(results.date_range.start).toLocaleDateString('tr-TR')} - ${new Date(results.date_range.end).toLocaleDateString('tr-TR')}</li>
+                    <li><strong>Analiz Tarihi:</strong> ${new Date(results.analysis_date).toLocaleDateString('tr-TR')}</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h5>Model Durumu</h5>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check-circle text-success"></i> ARIMA: ${results.arima && !results.arima.error ? 'Başarılı' : 'Hata'}</li>
+                    <li><i class="bi bi-check-circle text-success"></i> LSTM: ${results.lstm && !results.lstm.error ? 'Başarılı' : 'Hata'}</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Prophet: ${results.prophet && !results.prophet.error ? 'Başarılı' : 'Hata'}</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    html += '</div>';
+    return html;
+}
+
+// Update model performance metrics
+function updateModelPerformance(results) {
+    const models = [
+        { name: 'arima', mae: 'arimaMae', rmse: 'arimaRmse', extra: 'arimaAic' },
+        { name: 'lstm', mae: 'lstmMae', rmse: 'lstmRmse', extra: 'lstmValLoss' },
+        { name: 'prophet', mae: 'prophetMae', rmse: 'prophetRmse', extra: 'prophetTrend' }
+    ];
+    
+    models.forEach(model => {
+        if (results[model.name] && !results[model.name].error) {
+            const data = results[model.name];
+            document.getElementById(model.mae).textContent = `₺${data.mae.toFixed(2)}`;
+            document.getElementById(model.rmse).textContent = `₺${data.rmse.toFixed(2)}`;
+            
+            if (model.name === 'arima') {
+                document.getElementById(model.extra).textContent = data.aic.toFixed(2);
+            } else if (model.name === 'lstm') {
+                document.getElementById(model.extra).textContent = data.val_loss.toFixed(4);
+            } else if (model.name === 'prophet') {
+                document.getElementById(model.extra).textContent = 'Positive'; // Placeholder
+            }
+        }
+    });
+}
+
+// Create forecast chart
+function createForecastChart(results) {
+    // Implementation for forecast vs actual chart
+    // This would use Plotly to create an interactive chart
+    console.log('Creating forecast chart with:', results);
+}
+
+// Create market share chart
+function createMarketShareChart(results) {
+    // Implementation for market share pie chart
+    // This would use Plotly to create an interactive pie chart
+    console.log('Creating market share chart with:', results);
+}
+
+// Run multi-product analysis
+async function runMultiProductAnalysis(timeRange, analysisType) {
+    // Placeholder for multi-product analysis
+    return {
+        data_points: 1000,
+        analysis_date: new Date().toISOString(),
+        date_range: {
+            start: new Date(Date.now() - timeRange * 24 * 60 * 60 * 1000).toISOString(),
+            end: new Date().toISOString()
+        },
+        multi_product: true,
+        analysis_type: analysisType
+    };
+}
+
+// Export results
+function exportResults() {
+    if (!currentAnalysis) {
+        alert('Önce bir analiz çalıştırın');
+        return;
+    }
+    
+    const blob = new Blob([JSON.stringify(currentAnalysis, null, 2)], {
+        type: 'application/json'
+    });
+    
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analysis_results_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Schedule analysis
+function scheduleAnalysis() {
+    alert('Otomatik analiz özelliği yakında eklenecek!');
+}
+
+// Toggle fullscreen
+function toggleFullscreen() {
+    const container = document.getElementById('analysisContainer').parentElement.parentElement;
+    if (container.classList.contains('fullscreen')) {
+        container.classList.remove('fullscreen');
+    } else {
+        container.classList.add('fullscreen');
+    }
+}
+
+// Refresh analysis
+function refreshAnalysis() {
+    if (currentAnalysis) {
+        runAnalysis();
+    }
+}
+</script>
+
+<style>
+.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: white;
+    overflow: auto;
+}
+
+.analysis-results-trend {
+    animation: fadeIn 0.5s ease-in;
+}
+
+.analysis-results-competitive {
+    animation: slideIn 0.5s ease-in;
+}
+
+.analysis-results-forecasting {
+    animation: scaleIn 0.5s ease-in;
+}
+
+.analysis-results-risk {
+    animation: bounceIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { transform: translateX(-20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes bounceIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,26 @@
+{
+    "netliste": {
+        "email": "barisemre14308@gmail.com",
+        "password": "Mandalina123*",
+        "login_url": "https://networkstedarik.netliste.com/login",
+        "dashboard_url": "https://networkstedarik.netliste.com/purchaseDashboard"
+    },
+    "akakce": {
+        "base_url": "https://www.akakce.com",
+        "search_url": "https://www.akakce.com/arama/?q="
+    },
+    "email": {
+        "enabled": false,
+        "smtp_server": "",
+        "smtp_port": 587,
+        "sender_email": "",
+        "sender_password": "",
+        "recipient_email": ""
+    },
+    "settings": {
+        "price_threshold": 0.10,
+        "min_sellers": 3,
+        "request_delay": [2, 5],
+        "max_retries": 3
+    }
+}
