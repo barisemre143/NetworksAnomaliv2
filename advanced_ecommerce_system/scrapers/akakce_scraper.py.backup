@@ -21,7 +21,6 @@ import re
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.database.models import get_db_session, Product, MarketPrice, PriceAnomaly
-from core.sync_networks_api import NetworksAPISyncer
 
 # Logging yapılandırması
 logging.basicConfig(
@@ -342,35 +341,20 @@ class AkakceScraper:
                 
                 logger.info(f"⚠️ Anomali tespit edildi! Tip: {anomaly_type}, Önem: {severity}")
                 
-                # Mevcut açık anomali var mı kontrol et
-                existing_anomaly = session.query(PriceAnomaly).filter(
-                    PriceAnomaly.product_id == product_id,
-                    PriceAnomaly.is_resolved == False
-                ).first()
+                # Anomali kaydı oluştur
+                anomaly = PriceAnomaly(
+                    product_id=product_id,
+                    anomaly_type=anomaly_type,
+                    severity=severity,
+                    deviation_percent=price_diff_percent,
+                    detected_at=datetime.now(),
+                    is_resolved=False,
+                    notes=f"Akakçe scraping ile tespit edildi - {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+                )
                 
-                if existing_anomaly:
-                    # Mevcut anomaliyi güncelle
-                    existing_anomaly.anomaly_type = anomaly_type
-                    existing_anomaly.severity = severity
-                    existing_anomaly.deviation_percent = price_diff_percent
-                    existing_anomaly.detected_at = datetime.now()
-                    existing_anomaly.notes = f"Akakçe scraping ile güncellendi - {datetime.now().strftime("%d.%m.%Y %H:%M")}"
-                    logger.info(f"🔄 Mevcut anomali güncellendi: ID={existing_anomaly.id}")
-                    anomaly = existing_anomaly
-                else:
-                    # Yeni anomali kaydı oluştur
-                    anomaly = PriceAnomaly(
-                        product_id=product_id,
-                        anomaly_type=anomaly_type,
-                        severity=severity,
-                        deviation_percent=price_diff_percent,
-                        detected_at=datetime.now(),
-                        is_resolved=False,
-                        notes=f"Akakçe scraping ile tespit edildi - {datetime.now().strftime("%d.%m.%Y %H:%M")}"
-                    )
-                    session.add(anomaly)
-                    session.flush()  # ID almak için
-                    logger.info(f"✅ Yeni anomali oluşturuldu: ID={anomaly.id}")
+                session.add(anomaly)
+                session.flush()  # ID almak için
+                logger.info(f"✅ Anomali veritabanına eklendi: ID={anomaly.id}")
                 
                 anomalies.append({
                     'type': anomaly_type,
@@ -397,42 +381,25 @@ class AkakceScraper:
             return []
     
     def scrape_all_products(self):
-        """Networks API ile senkronize edip Akakçe scraping yap"""
-        logger.info("🔄 Networks API ile senkronizasyon başlıyor...")
-        
-        # Önce Networks API'den ürünleri sync et
-        syncer = NetworksAPISyncer()
-        sync_success = syncer.sync_products_to_database()
-        
-        if sync_success:
-            sync_stats = syncer.get_sync_stats()
-            logger.info(f"✅ Networks API sync tamamlandı: {sync_stats}")
-        else:
-            logger.warning("⚠️ Networks API sync başarısız, mevcut verilerle devam ediliyor...")
-        
+        """Veritabanındaki tüm aktif ürünler için scraping yap"""
         session = get_db_session()
         
         try:
-            # Networks'den gelen aktif ürünleri al (HBCV ile başlayanlar)
-            products = session.query(Product).filter(
-                Product.is_active == True,
-                Product.our_sku.like('HBCV%')  # Sadece Networks ürünleri
-            ).limit(20).all()  # İlk 20 ürün ile test
+            # Aktif ürünleri al
+            products = session.query(Product).filter(Product.is_active == True).all()
             session.close()
             
-            logger.info(f"🚀 {len(products)} Networks ürünü için Akakçe scraping başlıyor...")
+            logger.info(f"🚀 {len(products)} ürün için Akakçe scraping başlıyor...")
             
             scraped_count = 0
             anomaly_count = 0
             
             for product in products:
                 try:
-                    # Brand ile birlikte arama yap
-                    search_term = f"{product.brand} {product.name}".strip()
-                    logger.info(f"📊 İşleniyor: {search_term}")
+                    logger.info(f"📊 İşleniyor: {product.name}")
                     
                     # Ürün için Akakçe'den veri çek
-                    scraped_data = self.scrape_product_data(search_term)
+                    scraped_data = self.scrape_product_data(product.name)
                     
                     if scraped_data:
                         # Veritabanına kaydet

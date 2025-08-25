@@ -1,0 +1,24 @@
+{
+    "networks_api": {
+        "username": "networksAPIUser",
+        "password": "zbx5eW6ADbMrvg17HxWP58zKQWND7BUA",
+        "api_url": "https://networksadmin.netliste.com/api/getProductListWithCimriURL"
+    },
+    "akakce": {
+        "base_url": "https://www.akakce.com",
+        "search_url": "https://www.akakce.com/arama/?q="
+    },
+    "email": {
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": 587,
+        "sender_email": "barisemre14308@gmail.com",
+        "sender_password": "GMAIL_APP_PASSWORD_BURAYA",
+        "recipient_email": "barisemre14308@gmail.com"
+    },
+    "settings": {
+        "price_threshold": 0.10,
+        "min_sellers": 3,
+        "request_delay": [2, 5],
+        "max_retries": 3
+    }
+}

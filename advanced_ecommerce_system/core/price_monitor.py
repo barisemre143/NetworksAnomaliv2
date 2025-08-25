@@ -28,7 +28,7 @@ logging.basicConfig(
 )
 
 class PriceMonitor:
-    def __init__(self, config_file='config.json'):
+    def __init__(self, config_file='../config.json'):
         """Fiyat takip sistemi başlatıcısı"""
         self.config = self.load_config(config_file)
         self.session = requests.Session()
@@ -37,11 +37,10 @@ class PriceMonitor:
     def load_config(self, config_file):
         """Konfigürasyon dosyasını yükle"""
         default_config = {
-            "netliste": {
-                "email": "",
-                "password": "",
-                "login_url": "https://networkstedarik.netliste.com/login",
-                "dashboard_url": "https://networkstedarik.netliste.com/purchaseDashboard"
+            "networks_api": {
+                "username": "networksAPIUser",
+                "password": "zbx5eW6ADbMrvg17HxWP58zKQWND7BUA",
+                "api_url": "https://networksadmin.netliste.com/api/getProductListWithCimriURL"
             },
             "akakce": {
                 "base_url": "https://www.akakce.com",
@@ -97,44 +96,47 @@ class PriceMonitor:
         delay = random.uniform(*self.config['settings']['request_delay'])
         time.sleep(delay)
     
-    def login_netliste(self):
-        """Netliste sitesine giriş yap"""
-        logging.info("Netliste'ye giriş yapılıyor...")
+    def get_networks_api_products(self):
+        """Networks API'den ürün listesini al"""
+        logging.info("Networks API'den ürünler alınıyor...")
         
         try:
-            # Login sayfasını al
-            login_page = self.session.get(self.config['netliste']['login_url'])
-            soup = BeautifulSoup(login_page.content, 'html.parser')
+            # API credentials hazırla
+            auth = (self.config['networks_api']['username'], self.config['networks_api']['password'])
             
-            # CSRF token'ı bul (varsa)
-            csrf_token = soup.find('input', {'name': 'csrf_token'})
+            # API isteği gönder
+            response = self.session.get(self.config['networks_api']['api_url'], auth=auth)
             
-            # Login verilerini hazırla
-            login_data = {
-                'email': self.config['netliste']['email'],
-                'password': self.config['netliste']['password']
-            }
-            
-            if csrf_token:
-                login_data['csrf_token'] = csrf_token.get('value')
-            
-            # Login isteği gönder
-            response = self.session.post(
-                self.config['netliste']['login_url'],
-                data=login_data,
-                allow_redirects=True
-            )
-            
-            if "dashboard" in response.url.lower() or response.status_code == 200:
-                logging.info("Netliste girişi başarılı!")
-                return True
+            if response.status_code == 200:
+                products_data = response.json()
+                logging.info(f"Networks API'den {len(products_data)} ürün alındı")
+                
+                # Ürün verilerini standardize et
+                products = []
+                for product in products_data:
+                    if float(product.get('sellPrice', 0)) > 0:  # Sadece fiyatı olan ürünler
+                        products.append({
+                            'id': product['productID'],
+                            'name': product['productName'],
+                            'full_name': product['productFullName'],
+                            'current_price': float(product['sellPrice']),
+                            'brand': product['brand'],
+                            'category': product['productCategoryName'],
+                            'stock_code': product['stockCode'],
+                            'cimri_url': product.get('cimriURL', ''),
+                            'source': 'networks_api'
+                        })
+                
+                logging.info(f"{len(products)} aktif ürün hazırlandı")
+                return products
+                
             else:
-                logging.error("Netliste girişi başarısız!")
-                return False
+                logging.error(f"Networks API hatası: {response.status_code}")
+                return []
                 
         except Exception as e:
-            logging.error(f"Netliste giriş hatası: {e}")
-            return False
+            logging.error(f"Networks API bağlantı hatası: {e}")
+            return []
     
     def get_products_from_netliste(self):
         """Netliste'den ürün listesini al"""
@@ -178,15 +180,16 @@ class PriceMonitor:
             logging.error(f"Netliste ürün alma hatası: {e}")
             return []
     
-    def search_akakce_prices(self, product_name, max_sellers=5):
+    def search_akakce_prices(self, product_name, brand="", max_sellers=5):
         """Akakçe'den ürün fiyatlarını ara"""
-        logging.info(f"Akakçe'de aranıyor: {product_name}")
+        search_term = f"{brand} {product_name}".strip()
+        logging.info(f"Akakçe'de aranıyor: {search_term}")
         
         self.random_delay()
         
         try:
             # Ürün adını URL-safe hale getir
-            search_query = quote_plus(product_name)
+            search_query = quote_plus(search_term)
             search_url = f"{self.config['akakce']['search_url']}{search_query}"
             
             response = self.session.get(search_url)
@@ -194,48 +197,66 @@ class PriceMonitor:
             
             prices = []
             
-            # Fiyat listelerini bul
+            # Fiyat listelerini bul (Akakçe'nin yeni yapısına uygun)
             price_elements = soup.find_all(['span', 'div'], class_=lambda x: x and any(
-                keyword in x.lower() for keyword in ['price', 'fiyat', 'fy_v8']
+                keyword in x.lower() for keyword in ['price', 'fiyat', 'fy_v8', 'pt_v8']
             ))
             
-            for element in price_elements[:max_sellers]:
+            for element in price_elements[:max_sellers * 2]:  # Daha fazla element kontrol et
                 try:
                     price_text = element.get_text(strip=True)
                     # Fiyat formatını temizle (₺, TL, virgül vs.)
                     price_clean = ''.join(c for c in price_text if c.isdigit() or c in '.,')
                     price_clean = price_clean.replace(',', '.')
                     
-                    if price_clean:
+                    if price_clean and '.' in price_clean:
+                        # Ondalık ayıracı kontrol et
+                        parts = price_clean.split('.')
+                        if len(parts) == 2 and len(parts[1]) <= 2:  # Normal fiyat formatı
+                            price = float(price_clean)
+                            if 1000 <= price <= 200000:  # Mantıklı fiyat aralığı
+                                prices.append(price)
+                                if len(prices) >= max_sellers:
+                                    break
+                    elif price_clean and len(price_clean) >= 4:  # Sadece rakam
                         price = float(price_clean)
-                        if price > 0:
+                        if 1000 <= price <= 200000:
                             prices.append(price)
+                            if len(prices) >= max_sellers:
+                                break
                             
                 except (ValueError, AttributeError):
                     continue
             
             if len(prices) >= self.config['settings']['min_sellers']:
                 avg_price = sum(prices) / len(prices)
-                logging.info(f"{product_name}: {len(prices)} satıcı, ortalama: {avg_price:.2f}₺")
+                logging.info(f"{search_term}: {len(prices)} satıcı, ortalama: {avg_price:.2f}₺")
                 return {
                     'prices': prices,
                     'average': avg_price,
-                    'seller_count': len(prices)
+                    'seller_count': len(prices),
+                    'min_price': min(prices),
+                    'max_price': max(prices)
                 }
             else:
-                logging.warning(f"{product_name}: Yeterli satıcı bulunamadı ({len(prices)})")
+                logging.warning(f"{search_term}: Yeterli satıcı bulunamadı ({len(prices)})")
                 return None
                 
         except Exception as e:
-            logging.error(f"Akakçe arama hatası ({product_name}): {e}")
+            logging.error(f"Akakçe arama hatası ({search_term}): {e}")
             return None
     
-    def analyze_price_anomalies(self, products):
+    def analyze_price_anomalies(self, products, max_products=10):
         """Fiyat anomalilerini tespit et"""
         anomalies = []
+        processed_count = 0
         
-        for product in products:
-            akakce_data = self.search_akakce_prices(product['name'])
+        for product in products[:max_products]:  # Sınırlı sayıda ürün işle
+            processed_count += 1
+            logging.info(f"İşleniyor ({processed_count}/{min(len(products), max_products)}): {product['brand']} {product['name']}")
+            
+            # Brand bilgisi ile arama yap
+            akakce_data = self.search_akakce_prices(product['name'], product['brand'])
             
             if akakce_data:
                 current_price = product['current_price']
@@ -248,16 +269,27 @@ class PriceMonitor:
                     anomaly_type = "YÜKSEK" if current_price > market_avg else "DÜŞÜK"
                     
                     anomalies.append({
+                        'product_id': product['id'],
                         'product_name': product['name'],
+                        'full_name': product['full_name'],
+                        'brand': product['brand'],
+                        'category': product['category'],
                         'our_price': current_price,
                         'market_average': market_avg,
+                        'market_min': akakce_data['min_price'],
+                        'market_max': akakce_data['max_price'],
                         'difference_percent': price_difference * 100,
                         'anomaly_type': anomaly_type,
                         'seller_count': akakce_data['seller_count'],
+                        'cimri_url': product.get('cimri_url', ''),
                         'timestamp': datetime.now().isoformat()
                     })
                     
-                    logging.warning(f"ANOMALI: {product['name']} - Bizim: {current_price}₺, Piyasa: {market_avg:.2f}₺")
+                    logging.warning(f"ANOMALI: {product['brand']} {product['name']} - Bizim: {current_price}₺, Piyasa: {market_avg:.2f}₺ ({price_difference*100:.1f}% fark)")
+                else:
+                    logging.info(f"Normal: {product['brand']} {product['name']} - Bizim: {current_price}₺, Piyasa: {market_avg:.2f}₺")
+            else:
+                logging.warning(f"Piyasa verisi bulunamadı: {product['brand']} {product['name']}")
         
         return anomalies
     
@@ -336,30 +368,29 @@ class PriceMonitor:
         
         logging.info(f"Sonuçlar kaydedildi: {filename}")
     
-    def run(self):
+    def run(self, max_products=10):
         """Ana çalışma fonksiyonu"""
-        logging.info("=== Fiyat Takip Sistemi Başlıyor ===")
+        logging.info("=== Networks Fiyat Takip Sistemi Başlıyor ===")
         
-        # Netliste'ye giriş yap
-        if not self.login_netliste():
-            return False
-        
-        # Ürünleri al
-        products = self.get_products_from_netliste()
+        # Networks API'den ürünleri al
+        products = self.get_networks_api_products()
         if not products:
-            logging.error("Ürün bulunamadı!")
+            logging.error("Networks API'den ürün alınamadı!")
             return False
+        
+        logging.info(f"Toplam {len(products)} ürün bulundu, {max_products} tanesi işlenecek")
         
         # Anomali analizi
-        anomalies = self.analyze_price_anomalies(products)
+        anomalies = self.analyze_price_anomalies(products, max_products)
         
         # Sonuçları kaydet
         self.save_results(anomalies)
         
-        # Email gönder (anomali varsa)
+        # Email gönder (anomali varsa - şu an pasif)
         if anomalies:
-            self.send_email_alert(anomalies)
-            logging.info(f"✅ {len(anomalies)} anomali tespit edildi ve email gönderildi!")
+            logging.info(f"✅ {len(anomalies)} anomali tespit edildi!")
+            for anomaly in anomalies:
+                logging.info(f"   - {anomaly['brand']} {anomaly['product_name']}: {anomaly['our_price']}₺ vs {anomaly['market_average']:.2f}₺ ({anomaly['difference_percent']:.1f}% {anomaly['anomaly_type']})")
         else:
             logging.info("✅ Hiç anomali tespit edilmedi.")
         
@@ -369,7 +400,7 @@ class PriceMonitor:
 def main():
     """Manuel çalıştırma"""
     monitor = PriceMonitor()
-    monitor.run()
+    monitor.run(max_products=5)  # Test için 5 ürün
 
 if __name__ == "__main__":
     main()

@@ -21,6 +21,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.database.models import get_db_session, Product, PriceHistory, MarketPrice, PriceAnomaly
 from analysis.trend_analysis.trend_analyzer import TrendAnalyzer
 from scrapers.akakce_scraper import AkakceScraper
+from core.sync_networks_api import NetworksAPISyncer
 
 # Flask app setup
 app = Flask(__name__)
@@ -498,6 +499,48 @@ def api_scraping_status():
         return jsonify({'error': str(e)}), 500
 
 # Error handlers
+@app.route('/api/sync-networks', methods=['POST'])
+def sync_networks_api():
+    """Networks API ile veritabanını senkronize et"""
+    try:
+        logger.info("Networks API sync başlatıldı...")
+        
+        syncer = NetworksAPISyncer()
+        success = syncer.sync_products_to_database()
+        
+        if success:
+            stats = syncer.get_sync_stats()
+            logger.info(f"Networks API sync başarılı: {stats}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Networks API sync tamamlandı!',
+                'stats': stats
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Networks API sync başarısız!'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Networks API sync hatası: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Sync hatası: {str(e)}'
+        }), 500
+
+@app.route('/api/networks-stats')
+def networks_stats():
+    """Networks API sync istatistiklerini al"""
+    try:
+        syncer = NetworksAPISyncer()
+        stats = syncer.get_sync_stats()
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Stats hatası: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.errorhandler(404)
 def not_found(error):
     return render_template('error.html', error="Sayfa bulunamadı"), 404
